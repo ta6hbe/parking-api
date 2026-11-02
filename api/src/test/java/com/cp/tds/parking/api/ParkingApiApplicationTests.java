@@ -1,4 +1,4 @@
-package com.cp.tds.parking;
+package com.cp.tds.parking.api;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
