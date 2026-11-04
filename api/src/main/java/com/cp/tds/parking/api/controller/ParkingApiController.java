@@ -6,6 +6,7 @@ import com.cp.tds.parking.api.mapper.OccupancyMapper;
 import com.cp.tds.parking.api.service.OccupancyService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -34,5 +35,13 @@ public class ParkingApiController {
 
         return ResponseEntity.ok(occupancy);
 
+    }
+
+    @GetMapping("/{locationId}")
+    public ResponseEntity<GetParkingResponse> getParkingByLocationId(@PathVariable Long locationId) {
+        GetParkingResponse occupancy = occupancyMapper.toResponse(
+                occupancyService.getOccupancy(locationId)
+        );
+        return ResponseEntity.ok(occupancy);
     }
 }
