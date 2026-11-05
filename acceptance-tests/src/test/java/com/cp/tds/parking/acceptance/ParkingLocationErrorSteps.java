@@ -1,15 +1,11 @@
 package com.cp.tds.parking.acceptance;
 
-import com.cp.tds.parking.api.config.ParkingProperties;
-import com.cp.tds.parking.api.domain.ParkingLocation;
-import io.cucumber.java.en.Given;
+import com.cp.tds.parking.acceptance.dto.ProblemResponse;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.RestClient;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,30 +14,18 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class ParkingLocationErrorSteps {
 
-    private final ParkingProperties parkingProperties;
-    private final RestClient client;
-
+    private final AtHelper helper;
     private ResponseEntity<ProblemResponse> response;
     private long requestedLocationId;
 
-    public ParkingLocationErrorSteps(Environment environment, ParkingProperties parkingProperties) {
-        this.parkingProperties = parkingProperties;
-        int port = environment.getRequiredProperty("server.port", Integer.class);
-        this.client = RestClient.create("http://localhost:" + port);
-    }
-
-    @Given("parking location {long} is not configured")
-    public void parkingLocationIsNotConfigured(long locationId) {
-        assertThat(parkingProperties.getLocations())
-                .as("configured location IDs")
-                .extracting(ParkingLocation::id)
-                .doesNotContain(locationId);
+    public ParkingLocationErrorSteps(AtHelper helper) {
+        this.helper = helper;
     }
 
     @When("I request parking availability for an unknown location {long}")
     public void iRequestAvailabilityForAnUnknownLocation(long locationId) {
         requestedLocationId = locationId;
-        response = client.get()
+        response = helper.getClient().get()
                 .uri("/parking/" + locationId)
                 .retrieve()
                 .onStatus(status -> status.value() == 404, (request, clientResponse) -> {
@@ -76,11 +60,5 @@ public class ParkingLocationErrorSteps {
         assertThat(response.getBody().detail())
                 .as("problem detail identifies the missing location")
                 .contains(Long.toString(requestedLocationId));
-    }
-
-    /**
-     * Represents expected problem fields independently of the server error implementation.
-     */
-    public record ProblemResponse(int status, String title, String detail) {
     }
 }
