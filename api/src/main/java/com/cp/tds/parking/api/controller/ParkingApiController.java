@@ -2,11 +2,16 @@ package com.cp.tds.parking.api.controller;
 
 import com.cp.tds.parking.api.config.ParkingProperties;
 import com.cp.tds.parking.api.dto.GetParkingResponse;
+import com.cp.tds.parking.api.dto.PostParkingRequest;
+import com.cp.tds.parking.api.dto.PostParkingResponse;
 import com.cp.tds.parking.api.mapper.OccupancyMapper;
 import com.cp.tds.parking.api.service.OccupancyService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -38,10 +43,19 @@ public class ParkingApiController {
     }
 
     @GetMapping("/{locationId}")
-    public ResponseEntity<GetParkingResponse> getParkingByLocationId(@PathVariable Long locationId) {
+    public ResponseEntity<GetParkingResponse> getParkingByLocationId(
+            @PathVariable Long locationId) {
         GetParkingResponse occupancy = occupancyMapper.toResponse(
                 occupancyService.getOccupancy(locationId)
         );
         return ResponseEntity.ok(occupancy);
+    }
+
+    @PostMapping
+    public ResponseEntity<PostParkingResponse>  postParkingAtDefaultLocation(
+            @Valid @RequestBody PostParkingRequest postParkingRequest) {
+
+        // Not implemented yet
+        return null;
     }
 }
