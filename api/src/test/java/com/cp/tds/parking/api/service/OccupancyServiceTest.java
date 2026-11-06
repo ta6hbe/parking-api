@@ -1,6 +1,5 @@
 package com.cp.tds.parking.api.service;
 
-import com.cp.tds.parking.api.config.ParkingProperties;
 import com.cp.tds.parking.api.domain.ParkingLocation;
 import com.cp.tds.parking.api.domain.ParkingLocationOccupancy;
 import com.cp.tds.parking.api.domain.ParkingLocationStatus;
@@ -15,7 +14,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
@@ -44,7 +42,7 @@ class OccupancyServiceTest {
             Instant.now(Clock.fixed(EXPECTED_TIME, ZoneOffset.UTC)));
 
     @Mock
-    ParkingProperties parkingProperties;
+    LocationService locationService;
 
     @Mock
     ActiveParkingStayRepositoryI activeParkingStayRepository;
@@ -54,7 +52,7 @@ class OccupancyServiceTest {
     @BeforeEach
     void setUp() {
         Clock clock = Clock.fixed(EXPECTED_TIME, ZoneOffset.UTC);
-        subject = new OccupancyService(parkingProperties, activeParkingStayRepository, clock);
+        subject = new OccupancyService(locationService, activeParkingStayRepository, clock);
     }
 
     @Test
@@ -62,14 +60,14 @@ class OccupancyServiceTest {
         long locationId = 1L;
 
         // given parking location exists for locationId
-        doReturn(List.of(defaultParkingLocation)).when(parkingProperties).getLocations();
+        doReturn(defaultParkingLocation).when(locationService).findLocationById(locationId);
 
         // and parking location is empty
         doReturn(0L).when(activeParkingStayRepository).countByLocationId(eq(locationId));
 
         // when service checks for occupancy of location id
         ParkingLocationOccupancy actualOccupancy = subject.getOccupancy(defaultParkingLocation.id());
-        verify(parkingProperties, times(1)).getLocations();
+        verify(locationService, times(1)).findLocationById(locationId);
         verify(activeParkingStayRepository, times(1)).countByLocationId(eq(locationId));
 
         // then

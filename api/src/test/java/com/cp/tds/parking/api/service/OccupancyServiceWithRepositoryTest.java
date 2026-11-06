@@ -35,7 +35,7 @@ class OccupancyServiceWithRepositoryTest {
         assertThat(repository.tryAdd(TestFixtures.ACTIVE_STAY_L2_1)).isTrue();
 
         subject = new OccupancyService(
-                properties,
+                new LocationService(properties),
                 repository,
                 Clock.fixed(EXPECTED_TIME, ZoneOffset.UTC)
         );
