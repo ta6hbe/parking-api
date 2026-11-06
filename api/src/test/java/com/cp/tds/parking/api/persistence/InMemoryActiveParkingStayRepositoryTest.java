@@ -62,7 +62,7 @@ class InMemoryActiveParkingStayRepositoryTest {
 
         assertThat(subject.tryAdd(duplicate))
                 .as("same registration cannot have another active session")
-                .isFalse();
+                .isNotEmpty();
 
         assertThat(subject.countByLocationId(TestFixtures.PARKING_LOCATION_1.id()))
                 .as("original session remains at location 1")
@@ -145,7 +145,7 @@ class InMemoryActiveParkingStayRepositoryTest {
             assertThat(subject.tryAdd(stay))
                     .as("fixture session for registration %s is accepted",
                             stay.vehicleRegistration())
-                    .isTrue();
+                    .isEmpty();
         }
     }
 

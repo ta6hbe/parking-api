@@ -109,7 +109,7 @@ public class ParkingOccupancySteps {
             ParkingStay stay = helper.activeStayAt(locationId, spaceNumber);
             assertThat(helper.getActiveStays().tryAdd(stay))
                     .as("fixture session %s is accepted", stay.vehicleRegistration())
-                    .isTrue();
+                    .isEmpty();
         }
         context.recordExpectedActiveStays(locationId, count);
     }

@@ -57,7 +57,7 @@ Feature: Parking vehicle
     And parking location 2 has 0 active stays
     When a vehicle attempts to park at location <locationId> with:
       | vehicleReg    | vehicleType |
-      | l1 car1       | 1           |
+      | l101 car       | 1           |
     Then I get a 409 http response status
     And the parking rejection is a 409 problem
     When I request parking availability for location 1

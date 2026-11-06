@@ -8,6 +8,7 @@ import com.cp.tds.parking.api.persistence.ActiveParkingStayRepositoryI;
 import org.springframework.web.client.RestClient;
 
 import java.time.Clock;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -45,7 +46,7 @@ public class AtHelper {
                 UUID.randomUUID(),
                 locationId,
                 spaceNumber,
-                "L" + locationId + "CAR" + spaceNumber,
+                "L" + locationId + String.format(Locale.ROOT, "%02d", spaceNumber) + "CAR",
                 VehicleType.SMALL,
                 clock.instant(),
                 null,

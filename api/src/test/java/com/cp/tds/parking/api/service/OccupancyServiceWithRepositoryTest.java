@@ -30,9 +30,9 @@ class OccupancyServiceWithRepositoryTest {
         properties.setLocations(TestFixtures.LOCATIONS_LIST);
 
         var repository = new InMemoryActiveParkingStayRepository();
-        assertThat(repository.tryAdd(TestFixtures.ACTIVE_STAY_L1_1)).isTrue();
-        assertThat(repository.tryAdd(TestFixtures.ACTIVE_STAY_L1_2)).isTrue();
-        assertThat(repository.tryAdd(TestFixtures.ACTIVE_STAY_L2_1)).isTrue();
+        assertThat(repository.tryAdd(TestFixtures.ACTIVE_STAY_L1_1)).isEmpty();
+        assertThat(repository.tryAdd(TestFixtures.ACTIVE_STAY_L1_2)).isEmpty();
+        assertThat(repository.tryAdd(TestFixtures.ACTIVE_STAY_L2_1)).isEmpty();
 
         subject = new OccupancyService(
                 new LocationService(properties),

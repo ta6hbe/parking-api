@@ -1,8 +1,13 @@
 package com.cp.tds.parking.api.controller;
 
+import com.cp.tds.parking.api.exception.DuplicateRegistrationException;
+import com.cp.tds.parking.api.exception.LocationClosedException;
 import com.cp.tds.parking.api.exception.LocationNotFoundException;
+import com.cp.tds.parking.api.exception.LocationFullException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -17,6 +22,35 @@ public class ApiExceptionHandler {
         return ProblemDetail.forStatusAndDetail(
                 HttpStatus.NOT_FOUND,
                 lnfe.getMessage()
+        );
+    }
+
+    @ExceptionHandler({
+            LocationFullException.class,
+            LocationClosedException.class,
+            DuplicateRegistrationException.class})
+    public ProblemDetail handlerParkingConflict(RuntimeException exception) {
+        return ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                exception.getMessage()
+        );
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleUnreadableRequest(
+            HttpMessageNotReadableException exception) {
+        return ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST,
+                "Request body must contain valid JSON with the expected field types"
+        );
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ProblemDetail handleInvalidRequest(
+            MethodArgumentNotValidException exception) {
+        return ProblemDetail.forStatusAndDetail(
+                HttpStatus.BAD_REQUEST,
+                "Request fields failed validation"
         );
     }
 

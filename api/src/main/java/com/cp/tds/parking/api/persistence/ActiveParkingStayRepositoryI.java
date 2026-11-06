@@ -3,6 +3,7 @@ package com.cp.tds.parking.api.persistence;
 import com.cp.tds.parking.api.domain.ParkingStay;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
@@ -16,6 +17,6 @@ public interface ActiveParkingStayRepositoryI {
 
     OptionalInt findNextAvailableSpace(long locationId, int maxCapacity);
 
-    boolean tryAdd(ParkingStay parkingStay);
+    Optional<ParkingStay> tryAdd(ParkingStay parkingStay);
 
 }

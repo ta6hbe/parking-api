@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -26,10 +27,8 @@ public class InMemoryActiveParkingStayRepository implements ActiveParkingStayRep
     }
 
     @Override
-    public boolean tryAdd(ParkingStay stay) {
-        return activeStays.putIfAbsent(
-                stay.vehicleRegistration(), stay
-        ) == null;
+    public Optional<ParkingStay> tryAdd(ParkingStay stay) {
+        return Optional.ofNullable(activeStays.putIfAbsent(stay.vehicleRegistration(), stay));
     }
 
     @Override
