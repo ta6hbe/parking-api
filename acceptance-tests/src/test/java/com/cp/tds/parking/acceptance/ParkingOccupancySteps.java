@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -112,6 +113,29 @@ public class ParkingOccupancySteps {
                     .isEmpty();
         }
         context.recordExpectedActiveStays(locationId, count);
+    }
+
+    @Then("parking availability matches the successful concurrent bookings")
+    public void availabilityMatchesSuccessfulConcurrentBookings() {
+        List<Long> locationIds = context.concurrentParkingAttempts().stream()
+                .map(attempt -> attempt.locationId()).distinct().toList();
+        for (long locationId : locationIds) {
+            long successfulBookings = context.concurrentParkingAttempts().stream()
+                    .filter(attempt -> attempt.locationId() == locationId)
+                    .filter(attempt -> attempt.response().getStatusCode().equals(HttpStatus.CREATED)).count();
+            long expectedOccupied = context.expectedActiveStays(locationId) + successfulBookings;
+            int capacity = helper.configuredLocation(locationId).maxCapacity();
+
+            // Expectations come from Given fixtures and HTTP results, never repository counts.
+            assertThat(expectedOccupied).as("location %s stays within capacity", locationId)
+                    .isBetween(0L, (long) capacity);
+            requestAvailability("/parking/" + locationId);
+            assertThat(response.getBody()).as("location %s occupancy response", locationId).isNotNull();
+            assertThat(response.getBody().locationId()).isEqualTo(locationId);
+            assertThat(response.getBody().occupiedSpaces()).isEqualTo(expectedOccupied);
+            assertThat(response.getBody().availableSpaces()).isEqualTo(capacity - expectedOccupied);
+            responseShouldIncludeAnObservationTimestamp();
+        }
     }
 
     private void requestAvailability(String path) {

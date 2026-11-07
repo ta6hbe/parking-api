@@ -1,10 +1,14 @@
 package com.cp.tds.parking.acceptance;
 
+import com.cp.tds.parking.acceptance.dto.PostParkingResponse;
+import com.cp.tds.parking.acceptance.dto.ProblemResponse;
 import com.cp.tds.parking.api.config.ParkingProperties;
 import com.cp.tds.parking.api.domain.ParkingLocation;
 import com.cp.tds.parking.api.domain.ParkingStay;
 import com.cp.tds.parking.api.domain.VehicleType;
 import com.cp.tds.parking.api.persistence.ActiveParkingStayRepositoryI;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClient;
 
 import java.time.Clock;
@@ -52,6 +56,20 @@ public class AtHelper {
                 null,
                 null
         );
+    }
+
+    /** Sends a parking request and reads either the success or Problem Details response. */
+    public ResponseEntity<?> attemptToPark(String path, Object requestBody) {
+        return client.post()
+                .uri(path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestBody)
+                .exchange((request, response) -> {
+                    Object body = response.getStatusCode().is2xxSuccessful()
+                            ? response.bodyTo(PostParkingResponse.class)
+                            : response.bodyTo(ProblemResponse.class);
+                    return new ResponseEntity<>(body, response.getHeaders(), response.getStatusCode());
+                });
     }
 
     public ParkingProperties getParkingProperties() {

@@ -1,6 +1,7 @@
 package com.cp.tds.parking.api.controller;
 
 import com.cp.tds.parking.api.exception.DuplicateRegistrationException;
+import com.cp.tds.parking.api.exception.LocationBusyException;
 import com.cp.tds.parking.api.exception.LocationClosedException;
 import com.cp.tds.parking.api.exception.LocationNotFoundException;
 import com.cp.tds.parking.api.exception.LocationFullException;
@@ -27,6 +28,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler({
             LocationFullException.class,
+            LocationBusyException.class,
             LocationClosedException.class,
             DuplicateRegistrationException.class})
     public ProblemDetail handlerParkingConflict(RuntimeException exception) {

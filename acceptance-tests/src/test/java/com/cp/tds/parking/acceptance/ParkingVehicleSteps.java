@@ -2,13 +2,10 @@ package com.cp.tds.parking.acceptance;
 
 import com.cp.tds.parking.acceptance.dto.PostParkingRequest;
 import com.cp.tds.parking.acceptance.dto.PostParkingResponse;
-import com.cp.tds.parking.acceptance.dto.ProblemResponse;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.And;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 
 import java.util.Objects;
 
@@ -89,21 +86,7 @@ public class ParkingVehicleSteps {
     }
 
     private void attemptToPark(String path, Object requestBody) {
-        ResponseEntity<?> response = helper.getClient()
-                .post()
-                .uri(path)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(requestBody)
-                .exchange((request, clientResponse) -> {
-                    Object body;
-                    if (clientResponse.getStatusCode().is2xxSuccessful()) {
-                        body = clientResponse.bodyTo(PostParkingResponse.class);
-                    } else {
-                        body = clientResponse.bodyTo(ProblemResponse.class);
-                    }
-                    return new ResponseEntity<>(body, clientResponse.getHeaders(), clientResponse.getStatusCode());
-                });
-        context.recordParkingAttemptResponse(response);
+        context.recordParkingAttemptResponse(helper.attemptToPark(path, requestBody));
     }
 
     private PostParkingRequest parsePostParkingRequest(DataTable dataTable) {

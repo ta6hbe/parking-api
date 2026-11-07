@@ -1,8 +1,10 @@
 package com.cp.tds.parking.acceptance;
 
+import com.cp.tds.parking.acceptance.dto.ConcurrentParkingAttempt;
 import org.springframework.http.ResponseEntity;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -12,6 +14,7 @@ public class ScenarioContext {
 
     private final Map<Long, Integer> expectedActiveStays = new HashMap<>();
     private ResponseEntity<?> parkingAttemptResponse;
+    private List<ConcurrentParkingAttempt> concurrentParkingAttempts = List.of();
 
     public void recordExpectedActiveStays(long locationId, int count) {
         expectedActiveStays.put(locationId, count);
@@ -34,5 +37,16 @@ public class ScenarioContext {
             throw new AssertionError("No parking attempt has been made in this scenario");
         }
         return parkingAttemptResponse;
+    }
+
+    public void recordConcurrentParkingAttempts(List<ConcurrentParkingAttempt> attempts) {
+        concurrentParkingAttempts = List.copyOf(attempts);
+    }
+
+    public List<ConcurrentParkingAttempt> concurrentParkingAttempts() {
+        if (concurrentParkingAttempts.isEmpty()) {
+            throw new AssertionError("No concurrent parking attempts have been made in this scenario");
+        }
+        return concurrentParkingAttempts;
     }
 }

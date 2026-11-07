@@ -11,6 +11,7 @@ import java.util.List;
 @ConfigurationProperties(prefix = "parking")
 public class ParkingProperties {
 
+    int maxReservationRetryAttempts;
     private long defaultLocationId;
     private List<ParkingLocation> locations = List.of();
 
@@ -30,5 +31,13 @@ public class ParkingProperties {
 
     public List<ParkingLocation> getLocations() {
         return locations;
+    }
+
+    public int getMaxReservationRetryAttempts() {
+        return maxReservationRetryAttempts;
+    }
+
+    public void setMaxReservationRetryAttempts(int maxReservationRetryAttempts) {
+        this.maxReservationRetryAttempts = maxReservationRetryAttempts;
     }
 }
