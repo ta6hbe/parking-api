@@ -24,7 +24,7 @@ public class ParkingVehicleErrorSteps {
 
     @Then("the parking rejection is a {int} problem")
     public void parkingRejectionIsAProblem(int expectedStatus) {
-        assertProblem(context.parkingAttemptResponse(), expectedStatus);
+        assertProblem(context.attemptResponse(), expectedStatus);
     }
 
     @Then("{int} concurrent parking attempts are rejected with a {int} problem containing {string}")

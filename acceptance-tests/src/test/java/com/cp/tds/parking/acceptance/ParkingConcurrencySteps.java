@@ -1,8 +1,8 @@
 package com.cp.tds.parking.acceptance;
 
 import com.cp.tds.parking.acceptance.dto.ConcurrentParkingAttempt;
-import com.cp.tds.parking.acceptance.dto.PostParkingRequest;
-import com.cp.tds.parking.acceptance.dto.PostParkingResponse;
+import com.cp.tds.parking.acceptance.dto.PostVehicleParkRequest;
+import com.cp.tds.parking.acceptance.dto.PostVehicleParkResponse;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
@@ -116,7 +116,7 @@ public class ParkingConcurrencySteps {
     private BookingRequest parseRequest(Map<String, String> row) {
         assertThat(row).containsOnlyKeys("locationId", "vehicleReg", "vehicleType");
         return new BookingRequest(Long.parseLong(row.get("locationId")),
-                new PostParkingRequest(row.get("vehicleReg"), Integer.parseInt(row.get("vehicleType"))));
+                new PostVehicleParkRequest(row.get("vehicleReg"), Integer.parseInt(row.get("vehicleType"))));
     }
 
     private List<ConcurrentParkingAttempt> successfulAttempts() {
@@ -127,7 +127,7 @@ public class ParkingConcurrencySteps {
     private void assertValidBooking(ConcurrentParkingAttempt attempt) {
         assertThat(attempt.response().getHeaders().getContentType()).isNotNull()
                 .satisfies(type -> assertThat(type.isCompatibleWith(MediaType.APPLICATION_JSON)).isTrue());
-        PostParkingResponse body = successBody(attempt);
+        PostVehicleParkResponse body = successBody(attempt);
         assertThat(body.parkingSessionId()).as("session UUID").isNotNull();
         assertThat(body.timeIn()).as("entry timestamp").isNotNull();
         assertThat(body.vehicleReg()).as("normalised requested registration")
@@ -139,12 +139,12 @@ public class ParkingConcurrencySteps {
                 .isGreaterThan(context.expectedActiveStays(attempt.locationId()));
     }
 
-    private PostParkingResponse successBody(ConcurrentParkingAttempt attempt) {
+    private PostVehicleParkResponse successBody(ConcurrentParkingAttempt attempt) {
         assertThat(attempt.response().getBody()).as("successful booking response")
-                .isInstanceOf(PostParkingResponse.class);
-        return (PostParkingResponse) attempt.response().getBody();
+                .isInstanceOf(PostVehicleParkResponse.class);
+        return (PostVehicleParkResponse) attempt.response().getBody();
     }
 
     /** Holds a request before dispatch without sharing mutable scenario state with workers. */
-    private record BookingRequest(long locationId, PostParkingRequest body) {}
+    private record BookingRequest(long locationId, PostVehicleParkRequest body) {}
 }

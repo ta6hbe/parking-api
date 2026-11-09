@@ -1,12 +1,13 @@
 package com.cp.tds.parking.acceptance;
 
-import com.cp.tds.parking.acceptance.dto.PostParkingRequest;
-import com.cp.tds.parking.acceptance.dto.PostParkingResponse;
+import com.cp.tds.parking.acceptance.dto.PostVehicleParkRequest;
+import com.cp.tds.parking.acceptance.dto.PostVehicleParkResponse;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.And;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 
+import java.time.Instant;
 import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -14,27 +15,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Sends parking requests and verifies their status and successful response bodies.
  */
-public class ParkingVehicleSteps {
+public class VehicleParkingSteps {
 
     private final AtHelper helper;
 
     private final ScenarioContext context;
 
-    public ParkingVehicleSteps(AtHelper helper, ScenarioContext context) {
+    public VehicleParkingSteps(AtHelper helper, ScenarioContext context) {
         this.helper = helper;
         this.context = context;
     }
 
     @When("a vehicle attempts to park at the default location with:")
     public void parkAtDefaultLocationWithVehicle(DataTable dataTable) {
-
-        PostParkingRequest request =  parsePostParkingRequest(dataTable);
-        attemptToPark("/parking", request);
+        attemptToParkWithTable("/parking", dataTable);
     }
 
     @When("a vehicle attempts to park at location {long} with:")
     public void parkAtLocationWithVehicle(long locationId, DataTable dataTable) {
-        attemptToPark("/parking/" + locationId, parsePostParkingRequest(dataTable));
+        attemptToParkWithTable("/parking/" + locationId, dataTable);
     }
 
     @When("a vehicle attempts to park at the default location with JSON:")
@@ -44,7 +43,7 @@ public class ParkingVehicleSteps {
 
     @Then("I get a {int} http response status")
     public void parkingResponseHasStatus(int expectedStatusCode) {
-        assertThat(context.parkingAttemptResponse().getStatusCode().value())
+        assertThat(context.attemptResponse().getStatusCode().value())
                 .as("parking attempt response status")
                 .isEqualTo(expectedStatusCode);
     }
@@ -64,11 +63,11 @@ public class ParkingVehicleSteps {
                 .as("entry timestamp expectation marker")
                 .isEqualTo("TIMESTAMP");
 
-        Object responseBody = context.parkingAttemptResponse().getBody();
+        Object responseBody = context.attemptResponse().getBody();
         assertThat(responseBody).as("parking response body")
                 .isNotNull()
-                .isInstanceOf(PostParkingResponse.class);
-        PostParkingResponse body = (PostParkingResponse) responseBody;
+                .isInstanceOf(PostVehicleParkResponse.class);
+        PostVehicleParkResponse body = (PostVehicleParkResponse) responseBody;
 
         assertThat(body.parkingSessionId())
                 .as("session ID parsed as a UUID")
@@ -86,18 +85,40 @@ public class ParkingVehicleSteps {
     }
 
     private void attemptToPark(String path, Object requestBody) {
-        context.recordParkingAttemptResponse(helper.attemptToPark(path, requestBody));
+        context.recordVehicleParkResponse(helper.attemptToPark(path, requestBody));
     }
 
-    private PostParkingRequest parsePostParkingRequest(DataTable dataTable) {
+    private void attemptToParkWithTable(String path, DataTable dataTable) {
+
         var rows = dataTable.asMaps(String.class, String.class);
         assertThat(rows).hasSize(1);
 
         var row = rows.getFirst();
 
-        return new PostParkingRequest(
+        PostVehicleParkRequest request = new PostVehicleParkRequest(
                 row.get("vehicleReg"),
                 Integer.parseInt(Objects.requireNonNull(row.get("vehicleType")))
         );
+
+        if (row.containsKey("timeIn")) {
+            helper.setRequestTime(Instant.parse(Objects.requireNonNull(row.get("timeIn"))));
+        }
+
+        attemptToPark(path, request);
+    }
+
+    @And("the parking entry time is {string}")
+    public void parkingEntryTimeIs(String expectedTime) {
+        Object responseBody = context.attemptResponse().getBody();
+
+        assertThat(responseBody)
+                .as("parking response body")
+                .isInstanceOf(PostVehicleParkResponse.class);
+
+        PostVehicleParkResponse body = (PostVehicleParkResponse) responseBody;
+
+        assertThat(body.timeIn())
+                .as("parking entry time")
+                .isEqualTo(Instant.parse(expectedTime));
     }
 }

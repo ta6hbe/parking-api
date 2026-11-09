@@ -5,6 +5,6 @@ import org.springframework.http.ResponseEntity;
 /** Associates a concurrent HTTP parking response with its requested location and vehicle. */
 public record ConcurrentParkingAttempt(
         long locationId,
-        PostParkingRequest request,
+        PostVehicleParkRequest request,
         ResponseEntity<?> response) {
 }

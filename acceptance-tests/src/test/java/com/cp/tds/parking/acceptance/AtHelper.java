@@ -1,7 +1,9 @@
 package com.cp.tds.parking.acceptance;
 
-import com.cp.tds.parking.acceptance.dto.PostParkingResponse;
+import com.cp.tds.parking.acceptance.dto.PostVehicleDepartResponse;
+import com.cp.tds.parking.acceptance.dto.PostVehicleParkResponse;
 import com.cp.tds.parking.acceptance.dto.ProblemResponse;
+import com.cp.tds.parking.acceptance.helper.AdjustableClock;
 import com.cp.tds.parking.api.config.ParkingProperties;
 import com.cp.tds.parking.api.domain.ParkingLocation;
 import com.cp.tds.parking.api.domain.ParkingStay;
@@ -12,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClient;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -23,13 +26,13 @@ public class AtHelper {
     private final ParkingProperties parkingProperties;
     private final RestClient client;
     private final ActiveParkingStayRepositoryI activeStays;
-    private final Clock clock;
+    private final AdjustableClock clock;
 
     public AtHelper(
             ParkingProperties parkingProperties,
             RestClient client,
             ActiveParkingStayRepositoryI activeStays,
-            Clock clock) {
+            AdjustableClock clock) {
 
         this.parkingProperties = parkingProperties;
         this.client = client;
@@ -66,7 +69,20 @@ public class AtHelper {
                 .body(requestBody)
                 .exchange((request, response) -> {
                     Object body = response.getStatusCode().is2xxSuccessful()
-                            ? response.bodyTo(PostParkingResponse.class)
+                            ? response.bodyTo(PostVehicleParkResponse.class)
+                            : response.bodyTo(ProblemResponse.class);
+                    return new ResponseEntity<>(body, response.getHeaders(), response.getStatusCode());
+                });
+    }
+
+    public ResponseEntity<?> attemptToDepart(String path, Object requestBody) {
+        return client.post()
+                .uri(path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestBody)
+                .exchange((request, response) -> {
+                    Object body = response.getStatusCode().is2xxSuccessful()
+                            ? response.bodyTo(PostVehicleDepartResponse.class)
                             : response.bodyTo(ProblemResponse.class);
                     return new ResponseEntity<>(body, response.getHeaders(), response.getStatusCode());
                 });
@@ -86,5 +102,9 @@ public class AtHelper {
 
     public Clock getClock() {
         return clock;
+    }
+
+    public void setRequestTime(Instant instant) {
+        clock.setInstant(instant);
     }
 }

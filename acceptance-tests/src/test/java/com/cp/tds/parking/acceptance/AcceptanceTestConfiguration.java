@@ -1,16 +1,17 @@
 package com.cp.tds.parking.acceptance;
 
+import com.cp.tds.parking.acceptance.helper.AdjustableClock;
 import com.cp.tds.parking.api.config.ParkingProperties;
 import com.cp.tds.parking.api.persistence.ActiveParkingStayRepositoryI;
 import io.cucumber.spring.ScenarioScope;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import java.net.http.HttpClient;
-import java.time.Clock;
 import java.time.Duration;
 
 /**
@@ -36,11 +37,17 @@ public class AcceptanceTestConfiguration {
     }
 
     @Bean
+    @Primary
+    AdjustableClock adjustableClock() {
+        return new AdjustableClock("2026-11-08T00:00:00Z");
+    }
+
+    @Bean
     AtHelper atHelper(
             ParkingProperties parkingProperties,
             RestClient restClient,
             ActiveParkingStayRepositoryI activeStaysRepository,
-            Clock clock) {
+            AdjustableClock clock) {
         return new AtHelper(parkingProperties, restClient, activeStaysRepository, clock);
     }
 }

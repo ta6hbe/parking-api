@@ -13,7 +13,9 @@ import java.util.Map;
 public class ScenarioContext {
 
     private final Map<Long, Integer> expectedActiveStays = new HashMap<>();
-    private ResponseEntity<?> parkingAttemptResponse;
+    private ResponseEntity<?> vehicleParkingAttemptResponse;
+    private ResponseEntity<?> vehicleDepartAttemptResponse;
+    private ResponseEntity<?> attemptResponse;
     private List<ConcurrentParkingAttempt> concurrentParkingAttempts = List.of();
 
     public void recordExpectedActiveStays(long locationId, int count) {
@@ -28,15 +30,39 @@ public class ScenarioContext {
         return count;
     }
 
-    public void recordParkingAttemptResponse(ResponseEntity<?> response) {
-        parkingAttemptResponse = response;
+    public void recordVehicleParkResponse(ResponseEntity<?> response) {
+        vehicleParkingAttemptResponse = response;
+        recordAttemptResponse(response);
     }
 
-    public ResponseEntity<?> parkingAttemptResponse() {
-        if (parkingAttemptResponse == null) {
+    public void recordVehicleDepartResponse(ResponseEntity<?> response) {
+        vehicleDepartAttemptResponse = response;
+        recordAttemptResponse(response);
+    }
+
+    public void recordAttemptResponse(ResponseEntity<?> response) {
+        attemptResponse = response;
+    }
+
+    public ResponseEntity<?> vehicleParkingAttemptResponse() {
+        if (vehicleParkingAttemptResponse == null) {
+            throw new AssertionError("No vehicle parking attempt has been made in this scenario");
+        }
+        return vehicleParkingAttemptResponse;
+    }
+
+    public ResponseEntity<?> vehicleDepartAttemptResponse() {
+        if (vehicleDepartAttemptResponse == null) {
+            throw new AssertionError("No vehicle departure attempt has been made in this scenario");
+        }
+        return vehicleDepartAttemptResponse;
+    }
+
+    public ResponseEntity<?> attemptResponse() {
+        if (attemptResponse == null) {
             throw new AssertionError("No parking attempt has been made in this scenario");
         }
-        return parkingAttemptResponse;
+        return attemptResponse;
     }
 
     public void recordConcurrentParkingAttempts(List<ConcurrentParkingAttempt> attempts) {

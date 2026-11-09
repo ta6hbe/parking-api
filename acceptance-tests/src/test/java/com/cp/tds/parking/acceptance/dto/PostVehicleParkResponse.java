@@ -8,7 +8,7 @@ import java.util.UUID;
  * Kept independent of application DTOs so a server DTO change does not automatically
  * change the response structure expected by these tests.
  */
-public record PostParkingResponse(
+public record PostVehicleParkResponse(
         UUID parkingSessionId,
         String vehicleReg,
         int spaceNumber,
