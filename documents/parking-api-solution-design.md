@@ -37,18 +37,6 @@ There are no payment operations, location-management endpoints, history-report e
 
 {info}These diagrams describe the implementation that exists now. All repositories are in-process memory stores; configured locations are not stored in a location repository.{info}
 
-### System context — C4 context view
-
-```mermaid
-C4Context
-    title Parking API system context
-    Person(client, "API client", "Parks vehicles, checks occupancy, and requests final bills")
-    System(api, "Parking API", "One company per Java process; embedded HTTP server and in-memory stores")
-    Rel(client, api, "Parking, occupancy, and departure requests and responses", "HTTP / JSON")
-```
-
-The system runs as one executable JAR. Its three stores are separate, context-owned objects inside that Java process, not databases or external caches. Application instances do not share their contents. There are no external system connections in this implementation.
-
 ### Component responsibilities and dependencies
 
 ```mermaid
@@ -81,20 +69,6 @@ flowchart TB
 ```
 
 Repositories do not depend on one another. `DepartService` coordinates the repositories; `BillService` only calculates a charge. `LocationService` reads `ParkingProperties` directly, so a separate location repository is unnecessary.
-
-### Workflow: application startup and configuration
-
-```mermaid
-flowchart TD
-    Start["Start executable JAR or spring-boot:run"] --> Context["Create Spring application context"]
-    Context --> Load["Load application.properties<br/>Required imports: parking.properties and billing.properties"]
-    Load --> Bind["Bind ParkingProperties and BillingProperties<br/>Apply external configuration overrides"]
-    Bind --> Validate["Validate billing rates and interval constraints"]
-    Validate -->|"Invalid billing configuration"| Fail["Fail application startup"]
-    Validate -->|"Valid"| Ready["Initialise services, UTC clock, and three empty repositories<br/>Expose HTTP endpoints on port 8080 by default"]
-```
-
-The flow shows startup dependencies; Spring determines the exact bean-initialisation order. Location configuration remains fixed for the process lifetime. Acceptance execution substitutes its own profile, port, and clock as described below.
 
 ### Workflow: occupancy
 
@@ -228,52 +202,6 @@ flowchart TD
 ```
 
 Service cleanup happens before the exception reaches the controller advice. Formatting a response does not reverse storage operations.
-
-### Workflow: acceptance-test execution
-
-```mermaid
-flowchart TD
-    Verify["Maven verify"] --> Failsafe["Failsafe selects ParkingAcceptanceIT"]
-    Failsafe --> Start["Fresh Spring context for one scenario<br/>acceptance profile; port 8081; primary AdjustableClock"]
-    Start --> Given["Given: arrange vehicles through HTTP<br/>Verify initial occupancy through HTTP"]
-    Given --> When["When: apply optional event-time metadata<br/>Send actual HTTP request bodies"]
-    When --> Then["Then: assert status, body, messages, and later HTTP state"]
-    Then --> Close["Close context and release port"]
-    Close --> More{"Another scenario?"}
-    More -->|"Yes"| Start
-    More -->|"No"| Result["Failsafe verifies scenario results"]
-```
-
-### Workflow: concurrent parking acceptance requests
-
-```mermaid
-flowchart TD
-    Setup["Arrange initial stays through sequential HTTP calls"] --> Inputs["Parse request table and read scenario expectations before dispatch"]
-    Inputs --> Workers["Create executor workers and start barrier"]
-    Workers --> Barrier["All workers reach CyclicBarrier<br/>Maximum wait: 5 seconds"]
-    Barrier --> Send["Workers send competing parking HTTP requests<br/>No scenario-context access inside workers"]
-    Send --> Collect["Collect Future results<br/>Maximum wait: 15 seconds per result"]
-    Collect --> Stop["Shut down executor in finally<br/>Wait up to 5 seconds for termination"]
-    Stop --> Store["Store attempts in ScenarioContext on the scenario thread"]
-    Store --> Assert["Check success/rejection counts, unique sessions and spaces,<br/>error details, and subsequent HTTP occupancy"]
-```
-
-The shared HTTP client has a five-second connection timeout and ten-second read timeout. Coordination or transport failures fail the scenario; they are not counted as expected business rejections. Scenarios themselves remain sequential; concurrency is deliberate within a scenario. Concurrent HTTP coverage currently exercises parking; concurrent-departure scenarios are deferred.
-
-### Workflow: build, package, verify, and run
-
-```mermaid
-flowchart TD
-    Wrapper["Maven Wrapper: clean verify"] --> API["api module<br/>Compile and run Surefire tests"]
-    API --> Package["Package regular API JAR and executable -exec.jar"]
-    Package --> AT["acceptance-tests module<br/>Compile independent client DTOs and step definitions"]
-    AT --> Failsafe["Failsafe integration-test and verify<br/>Run HTTP scenarios against context-managed application"]
-    Failsafe --> Passed["Successful reactor build"]
-    Passed --> Run["java -jar api/target/api-0.0.1-SNAPSHOT-exec.jar"]
-    Run --> Server["Production configuration and UTC clock<br/>Embedded server on port 8080 by default"]
-```
-
-The Maven lifecycle separates focused tests from packaging and acceptance execution. `test` omits the later packaging and acceptance phases; `package` builds artefacts but does not execute Failsafe's integration-test/verify goals. The README gives the exact commands.
 
 ## Key Decisions & Alternatives Considered
 
