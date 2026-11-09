@@ -1,7 +1,7 @@
 package com.cp.tds.parking.api.mapper;
 
 import com.cp.tds.parking.api.domain.ParkingStay;
-import com.cp.tds.parking.api.dto.PostParkingResponse;
+import com.cp.tds.parking.api.dto.PostVehicleParkResponse;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class ParkingMapper {
 
-    public PostParkingResponse toResponse(ParkingStay stay) {
-        return new PostParkingResponse(
+    public PostVehicleParkResponse toResponse(ParkingStay stay) {
+        return new PostVehicleParkResponse(
                 stay.parkingSessionId(),
                 stay.vehicleRegistration(),
                 stay.spaceNumber(),

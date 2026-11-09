@@ -1,5 +1,7 @@
 package com.cp.tds.parking.api.controller;
 
+import com.cp.tds.parking.api.exception.ActiveStayNotFoundException;
+import com.cp.tds.parking.api.exception.DepartureConflictException;
 import com.cp.tds.parking.api.exception.DuplicateRegistrationException;
 import com.cp.tds.parking.api.exception.LocationBusyException;
 import com.cp.tds.parking.api.exception.LocationClosedException;
@@ -26,11 +28,21 @@ public class ApiExceptionHandler {
         );
     }
 
+    @ExceptionHandler(ActiveStayNotFoundException.class)
+    public ProblemDetail handleActiveStayNotFoundException(ActiveStayNotFoundException snfe) {
+        return ProblemDetail.forStatusAndDetail(
+                HttpStatus.NOT_FOUND,
+                snfe.getMessage()
+        );
+    }
+
     @ExceptionHandler({
             LocationFullException.class,
             LocationBusyException.class,
             LocationClosedException.class,
-            DuplicateRegistrationException.class})
+            DuplicateRegistrationException.class,
+            DepartureConflictException.class
+    })
     public ProblemDetail handlerParkingConflict(RuntimeException exception) {
         return ProblemDetail.forStatusAndDetail(
                 HttpStatus.CONFLICT,

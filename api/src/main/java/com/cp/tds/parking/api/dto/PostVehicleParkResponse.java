@@ -6,7 +6,7 @@ import java.util.UUID;
 /**
  * Describes a newly allocated parking session in the public API.
  */
-public record PostParkingResponse(
+public record PostVehicleParkResponse(
         UUID parkingSessionId,
         String vehicleReg,
         int spaceNumber,
