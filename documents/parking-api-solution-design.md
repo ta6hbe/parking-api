@@ -176,7 +176,7 @@ sequenceDiagram
     Clock-->>Depart: Departure instant
     Depart->>Bill: calculateCharge(original, timeOut)
     Bill-->>Depart: BigDecimal charge
-    Note over Depart: Create completed copy with original UUID; leave original unchanged
+    Note over Depart: Create completed copy with original UUID and leave original unchanged
     Depart->>History: tryAdd(completed)
     History-->>Depart: Inserted without replacing any entry
     Depart->>Active: remove(original)
