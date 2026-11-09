@@ -3,7 +3,7 @@
 Date: 2026-11-09  
 Status: current implementation and final take-home scope
 
-This document describes my design for the Parking API, the decisions behind its implementation, and the alternatives I considered. The decisions are final for this submission. The Impact section identifies current limitations and possible future extensions.
+This document describes my design for the Parking API, the decisions behind its implementation, and the main alternatives I considered. The decisions are final for this submission. The Impact section identifies current limitations and possible future extensions.
 
 ## Context
 
@@ -205,40 +205,29 @@ Service cleanup happens before the exception reaches the controller advice. Form
 
 ## Key Decisions & Alternatives Considered
 
-{info}The following decisions define my implementation. Each includes the alternatives I considered and the reasons for the final choice. Current limitations and deferred extensions are listed under Impact.{info}
+{info}The table summarises the main architectural trade-offs. The numbered sections record the final implementation decisions. Current limitations and future development options are listed under Impact.{info}
+
+### Main architectural trade-offs
+
+| Area | Selected approach | Alternative considered | Reason for the choice |
+| --- | --- | --- | --- |
+| Storage | In-memory collections behind independent repositories | An in-memory database such as H2 | Collections meet the storage requirement without database setup or schemas and keep storage operations explicit. |
+| Concurrency coordination | Temporary location-space reservations | One global or location-wide lock | Operations on independent spaces can proceed concurrently without taking a shared global or location-wide lock. |
+| Monetary calculation | Integer pence, with the final amount stored as `BigDecimal` | Floating-point charge calculations | Integer arithmetic expresses the rounding policy directly and avoids monetary rounding errors. Conversion to the documented `Double` occurs only at the HTTP response boundary. |
+| Session completion | Create an immutable completed copy | Mutate the active stay during billing | The active object remains unchanged while billing and history insertion are prepared, avoiding partially completed shared state. |
+| Acceptance setup | Arrange vehicles through HTTP requests | Insert fixtures directly into repositories | HTTP setup exercises the same validation and service operations as an external client, while focused unit tests cover internal failure paths. |
 
 ### D01 — Layered Spring Boot application and explicit responsibilities
 
 I chose Java 21 and Spring Boot 4.1.2. Controllers validate HTTP DTOs and invoke services; mappers produce public response DTOs; services own business flows; repositories encapsulate concurrent collections. I applied SOLID and DRY without introducing an interface for every service or a generic framework for every operation. `BillService` and `DepartService` remain separate.
 
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Put validation, arithmetic, allocation, and storage in the controller | Rejected: mixes HTTP concerns with business and storage rules and makes focused tests harder. |
-| A combined `DepartAndBillService`, or an extra `SpaceAllocationService` | Rejected: the selected `DepartService`, `BillService`, and existing `ParkingService` provide the required boundaries. |
-| Independently select versions for every managed library | Rejected: use Spring Boot dependency management where supplied; explicit project selections remain in the parent POM. |
-| Java 17 or a newer JDK baseline | Not selected: Java 21 is the project/runtime baseline. |
-
 ### D02 — One company, configured locations, and numbered spaces
 
 One application instance represents one company. It can serve multiple configured locations. A location has `id`, `name`, `maxCapacity`, and `status`; the implemented record has no description field. IDs are explicit configuration values independent of list position. Space numbers are integers from 1 through capacity. Every supported vehicle type can use every space; type changes the price, not allocation eligibility.
 
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| A single location only | Replaced by the selected multi-location extension while preserving default-location routes. |
-| Multiple companies inside one process | Out of scope: tenant ownership, isolation, and authorisation are not needed for the brief. Separate instances have independent data. |
-| Pre-create `ParkingSpace` objects | Rejected: numbered allocations and capacity express the required behaviour without another inventory model. |
-| Vehicle-size space pools or physical fit checks | Rejected: no such rules were specified. |
-| Generate location IDs from configuration order | Rejected: reordering the list must not change location identity. |
-
 ### D03 — Startup configuration, with no location repository
 
 `ParkingProperties` binds a copied list of `ParkingLocation` records. `LocationService` resolves that list; it rejects unknown IDs and has a separate lookup that also rejects CLOSED arrivals. An ACTIVE location permits all implemented operations. A CLOSED location still permits occupancy queries and departure. Departure derives location and space from the captured stay and does not call `LocationService`.
-
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| A separate in-memory location repository | Rejected: the locations are fixed configuration, so another storage abstraction adds no required behaviour. |
-| Reject every operation at a CLOSED location | Rejected: existing vehicles must still be able to leave and occupancy remains useful. |
-| Continue accepting new parking at CLOSED locations | Rejected: closure must affect admission. |
 
 ### D04 — Public API contracts and mapping
 
@@ -254,30 +243,11 @@ All requests use the defined paths without query parameters. Occupancy and parki
 
 The implemented DTOs are `GetParkingResponse`, `PostVehicleParkRequest`, `PostVehicleParkResponse`, `PostVehicleDepartRequest`, and `PostVehicleDepartResponse`. The three mappers are `OccupancyMapper`, `ParkingMapper`, and `DepartureMapper`.
 
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Expose the full `ParkingStay` directly | Rejected: location, space, and vehicle type belong in the complete domain/history record but not in the specified final-bill response. |
-| Replace all original routes with required location paths | Rejected: preserve the brief's endpoints. |
-| Use location headers, query parameters, or location fields in POST bodies | Rejected: explicit path variants express the optional location selection without changing the brief's request bodies. |
-| Add `/parking/{locationId}/bill` | Replaced by the registration-only global departure contract; no separate location resolution is needed. |
-| Require a request session UUID for departure | Rejected: the approved request targets the active stay captured by registration; the service rechecks its UUID internally. |
-| Omit `spaceNumber` because the brief's example JSON omits it | Rejected: the endpoint description explicitly requests the allocated space number. |
-| Return `204` after departure | Rejected: the operation returns a final bill, so success is `200`. |
-
 ### D05 — Validation at the HTTP boundary and normalised registration keys
 
 Use Jakarta Bean Validation on request DTOs, triggered by `@Valid`. Raw registrations may contain whitespace and lowercase letters but must follow the chosen simplified format: 1–2 ASCII letters, 2–3 digits, then 1–3 ASCII letters, with permitted whitespace between characters. `@NotBlank` rejects missing, null, or blank registration. This is a selected application restriction, not a complete validator for every UK registration format or a requirement from the brief.
 
 Services remove whitespace with `StringUtils.trimAllWhitespace` and uppercase with `Locale.ROOT` before using registration keys. DTO validation occurs before service normalisation; it does not require clients to send an already-normalised value. Production vehicle type is an `Integer` with `@NotNull`, `@Min(1)`, and `@Max(3)`.
-
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Accept any non-blank ASCII alphanumeric registration | Not selected: this implementation uses the simplified letter/digit format described above. |
-| Validate raw input against an uppercase-only pattern | Rejected: it would reject supported lowercase requests before normalisation. |
-| Use raw registration keys or scan with `equalsIgnoreCase` | Rejected: normalised keys support direct lookup and atomic duplicate rejection across spacing/case variants. |
-| Strip punctuation as part of normalisation | Rejected: invalid input must not silently become another registration. |
-| Use primitive `int` for required production request vehicle type | Rejected: `Integer` distinguishes missing input for validation. Test-owned DTOs remain independent. |
-| Ad hoc validation scattered through services/controllers | Rejected: declarative request constraints keep the HTTP boundary consistent. |
 
 ### D06 — Immutable session identity and lifecycle
 
@@ -285,28 +255,9 @@ Use one immutable `ParkingStay` record containing UUID, location, space, normali
 
 Parking generates a random UUID and entry instant for each proposed attempt; the successful proposal becomes the active session. Failed proposals are discarded. Departure never generates a replacement UUID. The UUID can identify a visit in responses and future tracing; structured session logging and HTTP correlation-ID infrastructure are not implemented.
 
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Mutate the active object during billing | Rejected: immutable completion avoids partially billed shared objects and active-object restoration. |
-| Separate active and completed record classes | Not selected: one record and explicit service construction are sufficient for this scope. |
-| Store a separate status flag | Rejected: it duplicates lifecycle fields and can disagree with them. |
-| Identify a visit only by registration or generate a new UUID at departure | Rejected: returning vehicles have distinct visits; departure must retain visit continuity. |
-| Seed UUID generation manually or derive identity from registration/time | Rejected: `UUID.randomUUID()` provides practical uniqueness without application seeding or deterministic input coupling. |
-
 ### D07 — Independent repositories and active-registration uniqueness
 
 Repositories manage only their own collection. Services hold the cross-repository operation boundary. Active stays use one global `ConcurrentHashMap<String, ParkingStay>` keyed by normalised registration, enforcing at most one active stay per vehicle across every location in this instance. `tryAdd` uses `putIfAbsent`: empty means inserted, present means the existing stay was retained. Removal uses `remove(registration, expectedStay)`.
-
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Repositories call one another | Rejected: tightly couples storage implementations and hides business coordination. `DepartService` coordinates the independent repositories. |
-| Find registration, then perform an ordinary put | Rejected: concurrent requests can both pass a preliminary lookup. Atomic insertion establishes uniqueness. |
-| Separate active maps per location or key active stays only by space | Rejected: these do not independently enforce global registration uniqueness. |
-| Add a separate registration index or registration-lock registry | Rejected: the global active map already supplies direct lookup and atomic insertion. |
-| Keep completed stays under the active registration key | Rejected: returning vehicles must be able to park again and have multiple historical visits. |
-| Use an in-memory database such as H2 | Not selected: plain collections meet the in-memory requirement without schemas, database setup, or ambiguity about the brief's database restriction. |
-| Use ordinary mutable maps without coordination | Rejected: independent requests can access the collections concurrently. |
-| Hold the collections directly in services | Not selected: repositories keep storage operations separate from business coordination. |
 
 ### D08 — Temporary location-space reservation locks
 
@@ -314,39 +265,13 @@ Use an initially empty `ConcurrentHashMap<String, ParkingStay>` keyed by the imp
 
 The term **reservation lock** describes this map-based exclusion protocol. There is no `ReentrantLock`, waiting queue, or preallocated lock per space. Parking and departure use the same repository. A successful arrival is briefly present in both active and reservation maps; active insertion happens before lock release, so there is no unprotected transfer gap.
 
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| A global or location-wide lock | Rejected: serialises unrelated spaces or locations. |
-| Locks keyed by vehicle type or different locks for parking and departure | Rejected: operations affecting the same space must exclude one another regardless of vehicle type or operation. |
-| Preallocate a `ReentrantLock` for every configured space | Replaced: temporary entries avoid allocating coordination objects for every possible space. |
-| Allocate a separate reservation token object | Not selected: the proposed or active stay already identifies the reservation owner. |
-| Track acquisition through a nullable owner variable shared across branches | Not selected: each successful acquisition has a clearly scoped `try/finally`. |
-| Check for a reservation and then insert separately | Rejected: only atomic acquisition closes the race. |
-| Release by key alone | Rejected: release must match the owner stay. |
-
 ### D09 — Candidate selection and bounded retries
 
-Search active allocations from 1 and choose the lowest missing valid space. Reserve it, recheck active occupancy, and atomically insert the same proposal by registration. Both reservation conflicts and post-acquisition occupancy conflicts use one retry budget. The configured value is 5 retries, meaning one initial attempt plus up to five retries. Exhaustion produces `LocationBusyException`, not `LocationFullException`.
-
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Exclude temporary reservations while selecting candidates | Explicitly rejected: active stays alone determine the candidate; temporary ownership is handled by acquisition and retry. |
-| Treat reserved but inactive spaces as full | Rejected: only active allocations establish fullness. |
-| Retry indefinitely | Rejected: sustained contention could prevent the request from returning. |
-| Use separate retry budgets for reservation and occupancy conflicts | Not selected: a shared budget bounds the total allocation attempts. |
-| Advance an offset after a conflict | Rejected: each retry restarts a fresh scan from 1. |
-| Hold a location-wide lock across selection and insertion, including concurrent departures | Not selected: it could enforce stronger minimum-space ordering, but would serialise operations on independent spaces. Selection from observed active allocations with a protected recheck is sufficient for this implementation. |
+Search active allocations from 1 and choose the lowest missing valid space. Reserve it, recheck active occupancy, and atomically insert the same proposal by registration. Both reservation conflicts and post-acquisition occupancy conflicts use one retry budget. The configured value is 5 retries, meaning one initial attempt plus up to five retries. Exhaustion produces `LocationBusyException`, not `LocationFullException`. Each retry starts from space 1 and considers active stays only; temporary reservations do not establish fullness.
 
 ### D10 — Derived occupancy without stored counters
 
 `OccupancyService` resolves the configured location, counts matching active stays once, derives availability from capacity, and records a `timeChecked` instant. The observation is not used as an allocation reservation or stored for subsequent requests.
-
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Store available/occupied counters or cache occupancy | Rejected: duplicates the active-stay state and adds consistency/invalidation obligations. |
-| Count available and occupied independently | Rejected: concurrent changes can make independent observations disagree. |
-| Lock an entire location to produce a snapshot | Rejected: live observational reporting is sufficient; admission is protected separately. |
-| Use a previous free-space count to authorise insertion | Rejected: the candidate's protected recheck and insertion determine admission. |
 
 ### D11 — Charging arithmetic and public numeric representation
 
@@ -373,15 +298,6 @@ Both divisions round down for non-negative inputs. `BillService` returns `BigDec
 
 Midnight and 24-hour boundaries do not reset charging. For example, a small-car stay of 25 hours is £450.00 with the supplied rates. Duration is elapsed time between instants, not a time-of-day subtraction.
 
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Charge only completed minutes or round started minutes up | Rejected: does not implement the selected proportional whole-second rule. |
-| Truncate a per-second rate before multiplying | Rejected: repeating fractions cause incorrect results, including 9p rather than 10p at one minute. |
-| Round fractional pence to nearest or up | Rejected: the selected base-charge rule rounds down. |
-| Charge a surcharge for started intervals or derive it from rounded minutes | Rejected: only completed intervals of actual whole elapsed seconds count. |
-| Perform money calculations with binary floating point or `Float` | Rejected: avoid monetary rounding errors. The final documented `Double` representation is a boundary conversion only. |
-| Perform every intermediate operation with `BigDecimal` | Not needed: integer arithmetic directly expresses the rounding policy. |
-
 ### D12 — Configured pricing and one supplied calculation instant
 
 `BillService` receives `BillingProperties` and a calculation instant supplied by its caller; it reads neither repositories nor the clock. `DepartService` captures one exit instant after acquiring the reservation lock and confirming UUID. It uses that same instant for calculation, completed history, and the response. Production time comes from the shared `Clock.systemUTC()` bean, and timestamps are `Instant` values rendered as ISO-8601 UTC timestamps.
@@ -404,16 +320,6 @@ Required configuration imports are `parking.properties` and `billing.properties`
 
 `BillingProperties` has startup validation: rates and interval charge are non-negative, and interval seconds is at least 1. Locations, pricing, and retry configuration are startup inputs rather than a runtime management API. Spring configuration supplies overrides; services do not read environment variables directly.
 
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Hard-code rates or calculate charges inside `DepartService` | Rejected: configured inputs and a separate calculator keep arithmetic independently testable. |
-| Direct environment-variable/file reads inside the calculator | Rejected: configuration binding supplies typed values before business operations. |
-| YAML or all settings in one application file | Not selected: separate properties files group the concerns while retaining one import entry point. |
-| Optional imports | Rejected: expected configuration files are required at startup. |
-| Read system time directly inside business operations | Rejected: an injected clock makes time-dependent behaviour deterministic in tests. |
-| Store local date-times without an offset or zone | Rejected: UTC instants identify unambiguous points in time across time zones and daylight-saving changes. |
-| Capture different times for billing, storage, and response | Rejected: one instant prevents discrepancies. |
-
 ### D13 — Departure reservation and session recheck
 
 Departure first finds the normalised registration, then attempts to acquire the captured stay's location-space reservation lock. Failure returns `DepartureConflictException` immediately, without retrying or releasing the other owner's lock. The competing operation need not be another departure or concern the same vehicle. The client message therefore describes the parking session's inability to complete, without exposing internal location-space details:
@@ -421,16 +327,6 @@ Departure first finds the normalised registration, then attempts to acquire the 
 > The parking session cannot be completed at this time because of a concurrent operation. Please try again.
 
 After acquisition, re-read the registration and compare its session UUID with the original. An absent or replaced session returns `ActiveStayNotFoundException`, releasing the acquired lock. Once confirmed, the service holds the lock through bill preparation, history insertion, and active removal.
-
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Use parking's retry policy for departure | Rejected: departure returns an immediate conflict so the client can decide whether to retry. |
-| Use the initial lookup without a post-acquisition UUID recheck | Rejected: the original stay can disappear or be replaced before acquisition. |
-| Compare only registration or space | Rejected: those can be reused by later sessions; UUID identifies the captured visit. |
-| Re-resolve or reject the stay's configured location | Rejected: location and space come from the active stay, and closure must not block departure. |
-| Name the exception `DepartureInProgressException` or `VehicleOperationInProgressException` | Replaced by `DepartureConflictException`: the failure is acquisition for this departure, not proof that the other operation is a departure or targets this vehicle. |
-| Say another operation is in progress “for this vehicle” or “for this parking space” in the HTTP detail | Replaced: the first can be misleading, while the second exposes an internal coordination detail absent from the request. |
-| Add a normal changed-session branch at active removal | Rejected: the UUID recheck and held reservation establish the protected stay; removal failure is an internal failure path, not another routine lookup outcome. |
 
 ### D14 — Departure commit boundary and ordinary failure cleanup
 
@@ -447,31 +343,13 @@ The departure flow is: validate and normalise input; find active stay; acquire i
 | Active removal succeeds | Keep completed history and leave registration available for another arrival. Do not restore active state. |
 | Release, response mapping, or delivery fails after commit | Report/propagate failure as applicable, but do not delete history or reinsert the departed stay. |
 
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Remove active first, then attempt fallible bill preparation/history insertion | Rejected: failure could release the vehicle before its completed record exists. |
-| Mutate active and keep a backup for restoration | Rejected: immutable completed copies leave the original untouched before removal. |
-| Acquire a separate history lock or give departure exclusive history access | Rejected: independent UUID insertions can proceed through concurrent repository operations. |
-| Copy and restore the entire history on failure | Rejected: cleanup must affect only this departure's insertion, without replacing another operation's changes. |
-| Return a reversible history-update handle | Not selected: the service already knows which completed record it inserted and can request conditional removal. |
-| Implement a custom transaction manager for the in-memory repositories | Not selected: explicit ordering and owned-insertion cleanup address this scope without a transaction framework. |
-| Undo departure after response mapping/delivery fails | Rejected: storage has already committed, and a later arrival may reuse the registration/space. |
-
 Spring `@Transactional` alone would not make ordinary map changes transactional. The implemented rollback behaviour comes from service-level ordering and conditional history removal, not from annotations or HTTP error formatting.
 
 ### D15 — Unbounded UUID-keyed history for the take-home
 
 Completed history is one `ConcurrentHashMap<UUID, ParkingStay>`. Its repository provides UUID lookup, non-overwriting insertion, and conditional removal. Different visits can share registration, location, or space but have different UUIDs. No capacity, FIFO order, expiry, background clearing, file export, or history endpoint is implemented.
 
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| No completed history | Not selected: retaining the completed session supports the chosen departure lifecycle and future reporting. |
-| Shared bounded queue, or a bounded deque per location with default capacity three times parking capacity | Replaced by the unbounded take-home policy: eviction during insertion creates additional rollback effects. |
-| `LinkedBlockingDeque`, `ConcurrentLinkedDeque`, `ArrayDeque`, or an insertion-ordered `LinkedHashMap` | Not selected for history: the settled operations are direct UUID lookup/insertion and owned-entry cleanup, rather than FIFO retention. |
-| A separate history UUID index, nested registration histories, or per-location history maps | Not needed: one UUID-keyed map supports repeat visits and concurrent independent insertions. |
-| An automatic evicting queue or manual capacity check, save victim, and restore on failure | Rejected for this slice: individually safe queue operations do not make eviction and restoration atomic; concurrent rollbacks can alter ordering or lose another record. |
-
-Future retention options are described under Impact. They are extensions to the current unbounded store, not rejected alternatives to the implemented repository.
+Future retention options are described under Impact.
 
 ### D16 — Business rejection status and Problem Details
 
@@ -488,22 +366,9 @@ Future retention options are described under Impact. They are extensions to the 
 
 `409` describes a conflict with the current resource state; it does not imply that two simultaneous requests are necessary. A full location is therefore a conflict even in sequential execution. A later repeated departure normally returns 404 because its active stay has been removed. A request that captured an old stay but later encounters another lock owner can instead return 409; timing and the protocol determine the outcome.
 
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| A custom error-envelope format | Rejected: use Spring's standard Problem Details representation for mapped errors. |
-| Return an old receipt when departure is repeated | Rejected: departure completes an active stay; historical receipt retrieval is a different operation. |
-| A `409` body that identifies a particular competing vehicle/operation | Rejected: acquisition failure does not establish those facts. |
-
 ### D17 — Test layers, test-first slices, and independent DTOs
 
 I used JUnit 5 and AssertJ for API-module tests, MockitoExtension for mocked service dependencies, and Cucumber for externally observable HTTP journeys. Tests exercise public interfaces. Test methods precede private helpers, parameterised sources explain their inputs, and assertions use readable field extraction. I developed the application in small test-first slices: establish an executable failure, implement the behaviour, and refactor with passing tests. The commit history includes a deliberately failing departure acceptance scenario followed by the implementation that makes it pass.
-
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Duplicate every rule at unit, HTTP integration, and acceptance levels | Rejected: test each concern at a level that gives useful confidence without repeating entire suites. |
-| Mock real application services/repositories in acceptance tests | Rejected: acceptance requests must exercise the real application path. Use mocks for focused service failure paths. |
-| Reflection/private-method tests, repository spying, or pauses inside application operations | Rejected: they test implementation interleavings rather than the public behaviour. |
-| Share production DTO classes with the HTTP acceptance client | Rejected: independent test-owned DTOs prevent a server DTO change from silently changing the expected contract. |
 
 Mocked dependency responses exercise service decisions and failure cleanup. They do not establish real concurrency behaviour; the separate concurrent parking scenarios exercise competing HTTP requests. Additional departure acceptance coverage is deferred as described under Impact.
 
@@ -522,17 +387,6 @@ I structure acceptance tests around the following principles:
 
 The acceptance module starts Spring Boot in-process on configured port 8081, with a fresh context for every scenario and sequential scenario execution. A primary `AdjustableClock` uses an atomic shared instant; zone-specific copies share that instant. Ordinary application components still depend on `Clock`. The test harness controls time in-process, so these are real HTTP-boundary tests rather than tests against a completely external deployed process.
 
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Arrange Given fixtures directly through repositories | Rejected: HTTP setup exercises the same request validation and service operations as an external client. |
-| Expose clock-setting, reset, or failure-switch endpoints | Rejected: test orchestration must not change the public contract. |
-| Feature steps that describe clock mechanics or wait in real time | Replaced by input event times and internal clock orchestration; no sleeps. |
-| Reuse one Spring context and clear/replace its collections | Rejected: creates reset obligations and stale-reference risks. Fresh contexts recreate all mutable state. |
-| Target a manually started application | Not selected: context-managed startup controls the application version, initial state, and shutdown for each scenario. |
-| Run the application in Testcontainers | Not selected: direct Spring Boot startup provides the required HTTP boundary without container infrastructure. |
-| Run Cucumber scenarios in parallel | Not selected: it requires additional port and state isolation. Deliberate concurrency within individual scenarios covers the selected concurrent behaviour. |
-| Random application ports | Not selected: a fixed configurable port makes manual inspection and debugging straightforward; context shutdown releases it between scenarios. |
-
 The adjustable clock is shared by requests in a scenario. Set its time before dispatching concurrent workers and leave it unchanged until those workers finish.
 
 ### D19 — Maven modules and executable-JAR delivery
@@ -540,13 +394,6 @@ The adjustable clock is shared by requests in a scenario. Set its time before di
 The Maven root is `parking`, containing `api` and `acceptance-tests`. The wrapper selects Maven 3.10.0. The parent selects Java 21, Spring Boot 4.1.2, Cucumber 8.0.4, and AssertJ 3.27.7. Surefire runs API-module tests in `test`; Failsafe runs `ParkingAcceptanceIT` in `integration-test` and checks results in `verify`. No Maven `acceptance` profile is needed; `acceptance` is the Spring test profile.
 
 The API module builds a regular JAR for the acceptance module's test dependency and an executable fat JAR with classifier `exec`. The executable artefact is `api/target/api-0.0.1-SNAPSHOT-exec.jar`; its dependencies, default configuration, and embedded server are included. Default application port is 8080.
-
-| Alternative considered | Disposition and reason |
-| --- | --- |
-| Keep Cucumber in the application module or run it in ordinary `test` | Rejected: separate dependencies and lifecycle phases keep the focused test loop independent of HTTP journeys. |
-| Require `-Pacceptance` to execute Failsafe | Not selected: lifecycle phases already separate the suites, and `clean verify` runs the complete verification directly. |
-| A WAR plus a separately managed servlet container | Rejected: the executable JAR is sufficient. |
-| Docker packaging | Not selected: an executable JAR and clear local instructions meet the brief's delivery requirements without an additional runtime prerequisite. |
 
 Container orchestration and database containers are outside the submission's delivery scope.
 
@@ -594,10 +441,11 @@ These are possible additions beyond this submission, not components of the imple
 
 | Extension considered | Purpose and constraints |
 | --- | --- |
+| Docker packaging | Package the executable JAR in a Java 21 runtime image and document image build/run commands for repeatable execution. This is an optional future delivery format; the current submission runs directly with Java. |
 | Runtime location/status management and dynamic pricing | Replace restart-based configuration with management operations if required. Pricing changes would need an explicit policy for sessions already in progress. |
 | Domain lifecycle factories | Enforce the active/completed field combinations when constructing a `ParkingStay`; the current services construct those combinations directly. |
 | More detailed error responses and acceptance coverage | Add field-specific validation details, explicit internal-error Problem Details handling, and additional departure/overnight/concurrency scenarios where they provide useful confidence. |
-| Quartz history cleanup by age | Remove stays based on `timeOut`, with retention age separate from cleanup frequency. Cleanup must coordinate with in-progress departures so it cannot delete uncommitted history. |
+| Quartz scheduled history cleanup | Schedule removal of completed stays from the history repository based on `timeOut`, with configurable retention age separate from cleanup frequency. Cleanup must coordinate with in-progress departures so it cannot delete uncommitted history. |
 | History soft limits and location-filtered jobs | Allow per-location policies and separate cleanup jobs. These are eventual cleanup targets, not strict capacity guarantees between job runs. Exact schedules, thresholds, calendar-month semantics, and coordination implementation remain future work. |
 | Historical reports, CSV/log export, or durable audit | Add retrieval/export only if required. Persistent history would require revisiting the brief's in-memory-only scope. |
 | Persistence-specific entities and mapping tools | Keep any future persistence model separate from domain records. Evaluate tools such as MapStruct if mapping complexity justifies them; none is needed for the current explicit mappers. |

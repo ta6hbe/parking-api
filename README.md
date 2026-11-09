@@ -144,6 +144,13 @@ The `api` module contains JUnit/AssertJ tests for services, repositories, and se
 
 The full Maven build passes, including **67 API tests and 31 acceptance scenarios**, with no failures, errors, or skipped tests. Dedicated concurrent-departure HTTP coverage and additional configuration-validation cases are deferred. See the [design's limitations](documents/parking-api-solution-design.md#current-limitations-and-deferred-work) for the precise boundary.
 
-Completed history is **unbounded and in memory**. It is lost on restart and can grow for the process lifetime. No history API or cleanup task runs. Future retention could use Quartz jobs based on departure age or soft per-location limits, with coordination for in-progress departures.
+Completed history is **unbounded and in memory**. It is lost on restart and can grow for the process lifetime. No history API or cleanup task runs.
 
 The submission has no persistent store, authentication, payment processing, running-bill endpoint, history export, or Docker packaging. The original brief does not require Docker. Separate application processes do not share state.
+
+## Future development options
+
+- **Docker packaging:** provide a Java 21 runtime image for the executable JAR, with documented build/run commands.
+- **Quartz scheduled history cleanup:** remove completed stays by departure age, with configurable retention periods and cleanup frequency. Optional soft per-location limits and location-filtered jobs could control growth. Cleanup must coordinate with in-progress departures so it cannot delete uncommitted history.
+
+See the [design's future extension options](documents/parking-api-solution-design.md#future-extension-options) for further details.
