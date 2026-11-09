@@ -2,7 +2,7 @@
 
 A car park management REST API for the Test Driven Solutions Java take-home task. It allocates parking spaces, reports occupancy, calculates final charges, and releases spaces on departure. All state is held in process memory.
 
-The [solution design and closed decisions](documents/parking-api-solution-design.md) describes the current architecture, every implemented workflow, assumptions, rejected alternatives, and deferred work.
+My assumptions and the questions I would have asked are listed [below](#assumptions). The [solution design](documents/parking-api-solution-design.md) describes the architecture, the main trade-offs, and current limitations.
 
 ## Prerequisites
 
@@ -137,6 +137,31 @@ java -jar api/target/api-0.0.1-SNAPSHOT-exec.jar \
 ```
 
 The default parking retry budget is five retries after the initial attempt. Departure reservation conflicts return immediately without retrying.
+
+## Assumptions
+
+- **Per-minute charging is applied pro rata per second.** The base charge uses whole elapsed seconds at the per-minute rate and rounds down to the penny, so a small car parked for 59 seconds pays £0.09.
+- **The £1 additional charge applies for each completed five minutes.** A stay of 4 minutes 59 seconds has no additional charge; a stay of exactly 5 minutes has one.
+- **Any vehicle type can use any space.** Vehicle type sets the rate, not which spaces a vehicle may use.
+- **"First available space" is the lowest-numbered free space.** Spaces are numbered from 1 to the location's capacity.
+- **A vehicle can have only one active stay at a time, across all locations.** A second arrival with the same registration is rejected with 409.
+- **Registrations follow a simplified UK-style format:** 1–2 letters, 2–3 digits, then 1–3 letters. Case and spaces are ignored, so `ab12 cde` and `AB12CDE` are the same vehicle.
+- **Departure is by registration only,** as in the brief. A vehicle that is not currently parked returns 404.
+- **`vehicleCharge` is a JSON number,** matching the brief's `double`, so £1.50 may appear as `1.5`. Charges are calculated in integer pence internally.
+- **Times are UTC,** in ISO-8601 format.
+- **Fields and routes beyond the brief are additions only.** `parkingSessionId`, `spaceNumber`, `locationId`, `timeChecked` and the `/{locationId}` routes are extra; the brief's fields are unchanged. `POST /parking` returns 201 Created.
+- **One instance, in memory.** All data is lost on restart, and separate instances do not share state. Location IDs in configuration are assumed to be unique; this is not validated at startup.
+
+## Questions I would have asked
+
+1. Should a part minute be charged as a full minute, or pro rata as implemented?
+2. Is the £1 charge added at the start of each five-minute period, or after each completed one?
+3. Should vehicle size restrict which spaces a vehicle can use, or how many spaces it takes?
+4. Which registration formats must be accepted, for example older UK formats, personalised plates or foreign vehicles?
+5. Is more than one car park needed, and how should capacity be set and changed?
+6. What should a bill request return for a vehicle that is not parked?
+7. Is a history of completed stays or receipts needed, and for how long should it be kept?
+8. Should `vehicleCharge` always show two decimal places, for example as a string, rather than a JSON number?
 
 ## Testing and scope
 
