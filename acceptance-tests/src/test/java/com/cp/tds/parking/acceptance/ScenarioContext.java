@@ -13,6 +13,7 @@ import java.util.Map;
 public class ScenarioContext {
 
     private final Map<Long, Integer> expectedActiveStays = new HashMap<>();
+    private final Map<Long, Integer> expectedCapacities = new HashMap<>();
     private ResponseEntity<?> vehicleParkingAttemptResponse;
     private ResponseEntity<?> vehicleDepartAttemptResponse;
     private ResponseEntity<?> attemptResponse;
@@ -20,6 +21,18 @@ public class ScenarioContext {
 
     public void recordExpectedActiveStays(long locationId, int count) {
         expectedActiveStays.put(locationId, count);
+    }
+
+    public void recordExpectedCapacity(long locationId, int capacity) {
+        expectedCapacities.put(locationId, capacity);
+    }
+
+    public int expectedCapacity(long locationId) {
+        Integer capacity = expectedCapacities.get(locationId);
+        if (capacity == null) {
+            throw new AssertionError("No expected capacity supplied for location " + locationId);
+        }
+        return capacity;
     }
 
     public int expectedActiveStays(long locationId) {
@@ -60,7 +73,7 @@ public class ScenarioContext {
 
     public ResponseEntity<?> attemptResponse() {
         if (attemptResponse == null) {
-            throw new AssertionError("No parking attempt has been made in this scenario");
+            throw new AssertionError("No HTTP response has been recorded in this scenario");
         }
         return attemptResponse;
     }

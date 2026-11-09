@@ -1,8 +1,6 @@
 package com.cp.tds.parking.acceptance;
 
 import com.cp.tds.parking.acceptance.helper.AdjustableClock;
-import com.cp.tds.parking.api.config.ParkingProperties;
-import com.cp.tds.parking.api.persistence.ActiveParkingStayRepositoryI;
 import io.cucumber.spring.ScenarioScope;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -44,10 +42,10 @@ public class AcceptanceTestConfiguration {
 
     @Bean
     AtHelper atHelper(
-            ParkingProperties parkingProperties,
             RestClient restClient,
-            ActiveParkingStayRepositoryI activeStaysRepository,
-            AdjustableClock clock) {
-        return new AtHelper(parkingProperties, restClient, activeStaysRepository, clock);
+            AdjustableClock clock,
+            Environment environment) {
+        return new AtHelper(restClient, clock,
+                environment.getRequiredProperty("parking.default-location-id", Long.class));
     }
 }

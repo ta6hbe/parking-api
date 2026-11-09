@@ -1,7 +1,9 @@
 Feature: Concurrent vehicle parking
 
   Scenario: The same registration cannot be booked concurrently at different locations
-    Given parking location 1 has 0 active stays
+    Given parking location 1 has a capacity of 10
+    And parking location 2 has a capacity of 20
+    And parking location 1 has 0 active stays
     And parking location 2 has 0 active stays
     When vehicles attempt to park concurrently with:
       | locationId | vehicleReg | vehicleType |
@@ -33,7 +35,9 @@ Feature: Concurrent vehicle parking
       | 8           | 2          |
 
   Scenario: Concurrent bookings at different locations may use the same space number
-    Given parking location 1 has 0 active stays
+    Given parking location 1 has a capacity of 10
+    And parking location 2 has a capacity of 20
+    And parking location 1 has 0 active stays
     And parking location 2 has 0 active stays
     When vehicles attempt to park concurrently with:
       | locationId | vehicleReg | vehicleType |
@@ -48,7 +52,9 @@ Feature: Concurrent vehicle parking
     And parking availability matches the successful concurrent bookings
 
   Scenario: Concurrent duplicate rejections leave spaces available for other vehicles
-    Given parking location 1 has 1 active stay
+    Given parking location 1 has a capacity of 10
+    And parking location 2 has a capacity of 20
+    And parking location 1 has 1 active stay
     And parking location 2 has 0 active stays
     When vehicles attempt to park concurrently with:
       | locationId | vehicleReg | vehicleType |

@@ -38,8 +38,8 @@ public class ParkingConcurrencySteps {
         List<BookingRequest> requests = parseRequests(table);
         assertThat(requests).as("at least two competing HTTP requests").hasSizeGreaterThanOrEqualTo(2);
         for (BookingRequest request : requests) {
-            helper.configuredLocation(request.locationId());
-            // Fixture counts must be recorded before dispatch; worker threads never access scenario state.
+            context.expectedCapacity(request.locationId());
+            // Scenario expectations are read before dispatch; workers never access scenario state.
             context.expectedActiveStays(request.locationId());
         }
         context.recordConcurrentParkingAttempts(bookTogether(requests));
@@ -133,8 +133,8 @@ public class ParkingConcurrencySteps {
         assertThat(body.vehicleReg()).as("normalised requested registration")
                 .isEqualTo(attempt.request().vehicleReg().replaceAll("\\s+", "").toUpperCase(Locale.ROOT));
         assertThat(body.spaceNumber()).as("valid space at the requested location")
-                .isBetween(1, helper.configuredLocation(attempt.locationId()).maxCapacity());
-        // The Given fixtures occupy spaces 1 through their recorded stay count.
+                .isBetween(1, context.expectedCapacity(attempt.locationId()));
+        // Sequential Given HTTP bookings verify spaces 1 through the recorded stay count.
         assertThat(body.spaceNumber()).as("allocation does not reuse a fixture's occupied space")
                 .isGreaterThan(context.expectedActiveStays(attempt.locationId()));
     }

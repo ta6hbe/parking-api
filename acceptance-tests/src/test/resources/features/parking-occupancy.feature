@@ -30,4 +30,4 @@ Feature: Parking occupancy
   Scenario: An unknown parking location returns a not-found problem
     Given parking location 999 is not configured
     When I request parking availability for an unknown location 999
-    Then the response should be a 404 problem
+    Then the response is a 404 problem containing "999"

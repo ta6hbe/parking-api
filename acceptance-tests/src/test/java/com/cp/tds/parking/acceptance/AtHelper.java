@@ -1,110 +1,74 @@
 package com.cp.tds.parking.acceptance;
 
+import com.cp.tds.parking.acceptance.dto.OccupancyResponse;
 import com.cp.tds.parking.acceptance.dto.PostVehicleDepartResponse;
 import com.cp.tds.parking.acceptance.dto.PostVehicleParkResponse;
 import com.cp.tds.parking.acceptance.dto.ProblemResponse;
 import com.cp.tds.parking.acceptance.helper.AdjustableClock;
-import com.cp.tds.parking.api.config.ParkingProperties;
-import com.cp.tds.parking.api.domain.ParkingLocation;
-import com.cp.tds.parking.api.domain.ParkingStay;
-import com.cp.tds.parking.api.domain.VehicleType;
-import com.cp.tds.parking.api.persistence.ActiveParkingStayRepositoryI;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClient;
 
-import java.time.Clock;
 import java.time.Instant;
-import java.util.Locale;
-import java.util.UUID;
 
 /**
- * Provides acceptance dependencies, location lookup, and fixture construction.
+ * Sends acceptance HTTP requests and supplies scenario event timing.
  */
 public class AtHelper {
 
-    private final ParkingProperties parkingProperties;
     private final RestClient client;
-    private final ActiveParkingStayRepositoryI activeStays;
     private final AdjustableClock clock;
+    private final long defaultLocationId;
 
     public AtHelper(
-            ParkingProperties parkingProperties,
             RestClient client,
-            ActiveParkingStayRepositoryI activeStays,
-            AdjustableClock clock) {
+            AdjustableClock clock,
+            long defaultLocationId) {
 
-        this.parkingProperties = parkingProperties;
         this.client = client;
-        this.activeStays = activeStays;
         this.clock = clock;
+        this.defaultLocationId = defaultLocationId;
     }
 
-    public ParkingLocation configuredLocation(long locationId) {
-        return parkingProperties.getLocations().stream()
-                .filter(location -> location.id() == locationId)
-                .findFirst()
-                .orElseThrow(() -> new AssertionError(
-                        "Expected configured parking location " + locationId));
+    public ResponseEntity<OccupancyResponse> getOccupancy(String path) {
+        return client.get().uri(path).retrieve().toEntity(OccupancyResponse.class);
     }
 
-    public ParkingStay activeStayAt(long locationId, int spaceNumber) {
-        return new ParkingStay(
-                UUID.randomUUID(),
-                locationId,
-                spaceNumber,
-                "L" + locationId + String.format(Locale.ROOT, "%02d", spaceNumber) + "CAR",
-                VehicleType.SMALL,
-                clock.instant(),
-                null,
-                null
-        );
+    public ResponseEntity<ProblemResponse> getOccupancyProblem(long locationId) {
+        return client.get().uri("/parking/" + locationId)
+                .exchange((request, response) -> new ResponseEntity<>(
+                        response.bodyTo(ProblemResponse.class),
+                        response.getHeaders(), response.getStatusCode()));
     }
 
     /** Sends a parking request and reads either the success or Problem Details response. */
     public ResponseEntity<?> attemptToPark(String path, Object requestBody) {
-        return client.post()
-                .uri(path)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(requestBody)
-                .exchange((request, response) -> {
-                    Object body = response.getStatusCode().is2xxSuccessful()
-                            ? response.bodyTo(PostVehicleParkResponse.class)
-                            : response.bodyTo(ProblemResponse.class);
-                    return new ResponseEntity<>(body, response.getHeaders(), response.getStatusCode());
-                });
+        return attemptPost(path, requestBody, PostVehicleParkResponse.class);
     }
 
     public ResponseEntity<?> attemptToDepart(String path, Object requestBody) {
-        return client.post()
-                .uri(path)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(requestBody)
-                .exchange((request, response) -> {
-                    Object body = response.getStatusCode().is2xxSuccessful()
-                            ? response.bodyTo(PostVehicleDepartResponse.class)
-                            : response.bodyTo(ProblemResponse.class);
-                    return new ResponseEntity<>(body, response.getHeaders(), response.getStatusCode());
-                });
+        return attemptPost(path, requestBody, PostVehicleDepartResponse.class);
     }
 
-    public ParkingProperties getParkingProperties() {
-        return parkingProperties;
-    }
-
-    public RestClient getClient() {
-        return client;
-    }
-
-    public ActiveParkingStayRepositoryI getActiveStays() {
-        return activeStays;
-    }
-
-    public Clock getClock() {
-        return clock;
+    public long getDefaultLocationId() {
+        return defaultLocationId;
     }
 
     public void setRequestTime(Instant instant) {
         clock.setInstant(instant);
+    }
+
+    private <T> ResponseEntity<?> attemptPost(
+            String path, Object requestBody, Class<T> successType) {
+        return client.post()
+                .uri(path)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestBody)
+                .exchange((request, response) -> {
+                    Object body = response.getStatusCode().is2xxSuccessful()
+                            ? response.bodyTo(successType)
+                            : response.bodyTo(ProblemResponse.class);
+                    return new ResponseEntity<>(body, response.getHeaders(), response.getStatusCode());
+                });
     }
 }

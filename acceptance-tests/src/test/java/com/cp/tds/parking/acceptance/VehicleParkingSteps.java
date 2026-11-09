@@ -4,7 +4,6 @@ import com.cp.tds.parking.acceptance.dto.PostVehicleParkRequest;
 import com.cp.tds.parking.acceptance.dto.PostVehicleParkResponse;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.And;
-import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 
 import java.time.Instant;
@@ -13,7 +12,7 @@ import java.util.Objects;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Sends parking requests and verifies their status and successful response bodies.
+ * Sends parking HTTP requests and verifies successful response bodies.
  */
 public class VehicleParkingSteps {
 
@@ -41,13 +40,6 @@ public class VehicleParkingSteps {
         attemptToPark("/parking", json);
     }
 
-    @Then("I get a {int} http response status")
-    public void parkingResponseHasStatus(int expectedStatusCode) {
-        assertThat(context.attemptResponse().getStatusCode().value())
-                .as("parking attempt response status")
-                .isEqualTo(expectedStatusCode);
-    }
-
     @And("post parking response contains:")
     public void responseBodyContainsAValidSessionUUIDTheVehicleRegistrationSpaceNumberAndNonNullEntryTimestamp(DataTable dataTable) {
         var rows = dataTable.asMaps(String.class, String.class);
@@ -63,25 +55,27 @@ public class VehicleParkingSteps {
                 .as("entry timestamp expectation marker")
                 .isEqualTo("TIMESTAMP");
 
-        Object responseBody = context.attemptResponse().getBody();
+        Object responseBody = context.vehicleParkingAttemptResponse().getBody();
         assertThat(responseBody).as("parking response body")
-                .isNotNull()
-                .isInstanceOf(PostVehicleParkResponse.class);
-        PostVehicleParkResponse body = (PostVehicleParkResponse) responseBody;
+                .isInstanceOf(PostVehicleParkResponse.class)
+                .extracting("vehicleReg", "spaceNumber")
+                .as("normalised registration and allocated parking space")
+                .containsExactly(expected.get("vehicleReg"),
+                        Integer.parseInt(Objects.requireNonNull(expected.get("spaceNumber"))));
+        assertThat(responseBody)
+                .extracting("parkingSessionId", "timeIn")
+                .as("session ID and entry timestamp parsed from the parking response")
+                .doesNotContainNull();
+    }
 
-        assertThat(body.parkingSessionId())
-                .as("session ID parsed as a UUID")
-                .isNotNull();
-
-        assertThat(body.vehicleReg())
-                .as("normalised vehicle registration")
-                .isEqualTo(expected.get("vehicleReg"));
-        assertThat(body.spaceNumber())
-                .as("allocated parking space")
-                .isEqualTo(Integer.parseInt(Objects.requireNonNull(expected.get("spaceNumber"))));
-        assertThat(body.timeIn())
-                .as("entry timestamp parsed as an Instant")
-                .isNotNull();
+    @And("the parking entry time is {string}")
+    public void parkingEntryTimeIs(String expectedTime) {
+        assertThat(context.vehicleParkingAttemptResponse().getBody())
+                .as("parking response body")
+                .isInstanceOf(PostVehicleParkResponse.class)
+                .extracting("timeIn")
+                .as("parking entry time")
+                .isEqualTo(Instant.parse(expectedTime));
     }
 
     private void attemptToPark(String path, Object requestBody) {
@@ -107,18 +101,4 @@ public class VehicleParkingSteps {
         attemptToPark(path, request);
     }
 
-    @And("the parking entry time is {string}")
-    public void parkingEntryTimeIs(String expectedTime) {
-        Object responseBody = context.attemptResponse().getBody();
-
-        assertThat(responseBody)
-                .as("parking response body")
-                .isInstanceOf(PostVehicleParkResponse.class);
-
-        PostVehicleParkResponse body = (PostVehicleParkResponse) responseBody;
-
-        assertThat(body.timeIn())
-                .as("parking entry time")
-                .isEqualTo(Instant.parse(expectedTime));
-    }
 }

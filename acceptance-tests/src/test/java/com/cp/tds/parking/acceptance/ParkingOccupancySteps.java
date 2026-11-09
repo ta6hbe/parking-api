@@ -1,15 +1,11 @@
 package com.cp.tds.parking.acceptance;
 
 import com.cp.tds.parking.acceptance.dto.OccupancyResponse;
-import com.cp.tds.parking.api.domain.ParkingLocation;
-import com.cp.tds.parking.api.domain.ParkingStay;
-import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-import java.time.Instant;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,7 +17,7 @@ public class ParkingOccupancySteps {
 
     private final AtHelper helper;
     private final ScenarioContext context;
-    private ParkingLocation selectedLocation;
+    private Long selectedLocationId;
     private ResponseEntity<OccupancyResponse> response;
 
     public ParkingOccupancySteps(AtHelper helper, ScenarioContext context) {
@@ -31,13 +27,13 @@ public class ParkingOccupancySteps {
 
     @When("I request its parking availability")
     public void iRequestItsParkingAvailability() {
-        selectedLocation = helper.configuredLocation(helper.getParkingProperties().getDefaultLocationId());
+        selectedLocationId = helper.getDefaultLocationId();
         requestAvailability("/parking");
     }
 
     @When("I request parking availability for location {long}")
     public void iRequestParkingAvailabilityForLocation(long locationId) {
-        selectedLocation = helper.configuredLocation(locationId);
+        selectedLocationId = locationId;
         requestAvailability("/parking/" + locationId);
 
         assertThat(response.getBody())
@@ -50,19 +46,19 @@ public class ParkingOccupancySteps {
 
     @Then("the number of available spaces should match its maximum capacity")
     public void availableSpacesShouldMatchMaximumCapacity() {
-        assertThat(selectedLocation)
+        assertThat(selectedLocationId)
                 .as("location selected by the scenario")
                 .isNotNull();
-        thereShouldBeAvailableSpaces(selectedLocation.maxCapacity());
+        thereShouldBeAvailableSpaces(context.expectedCapacity(selectedLocationId));
     }
 
     @Then("the number of available spaces should match its maximum capacity minus the active stays")
     public void availableSpacesShouldMatchCapacityMinusActiveStays() {
-        assertThat(selectedLocation)
+        assertThat(selectedLocationId)
                 .as("location selected by the scenario")
                 .isNotNull();
-        int expectedAvailable = selectedLocation.maxCapacity()
-                - context.expectedActiveStays(selectedLocation.id());
+        int expectedAvailable = context.expectedCapacity(selectedLocationId)
+                - context.expectedActiveStays(selectedLocationId);
         thereShouldBeAvailableSpaces(expectedAvailable);
     }
 
@@ -96,25 +92,6 @@ public class ParkingOccupancySteps {
                 .isNotNull();
     }
 
-    @Given("parking location {long} has {int} active stay(s)")
-    public void parkingLocationHasActiveStays(long locationId, int count) {
-        ParkingLocation location = helper.configuredLocation(locationId);
-        assertThat(count)
-                .as("fixture stay count for location %s", locationId)
-                .isBetween(0, location.maxCapacity());
-        assertThat(helper.getActiveStays().countByLocationId(locationId))
-                .as("location %s is empty before scenario setup", locationId)
-                .isZero();
-
-        for (int spaceNumber = 1; spaceNumber <= count; spaceNumber++) {
-            ParkingStay stay = helper.activeStayAt(locationId, spaceNumber);
-            assertThat(helper.getActiveStays().tryAdd(stay))
-                    .as("fixture session %s is accepted", stay.vehicleRegistration())
-                    .isEmpty();
-        }
-        context.recordExpectedActiveStays(locationId, count);
-    }
-
     @Then("parking availability matches the successful concurrent bookings")
     public void availabilityMatchesSuccessfulConcurrentBookings() {
         List<Long> locationIds = context.concurrentParkingAttempts().stream()
@@ -124,9 +101,9 @@ public class ParkingOccupancySteps {
                     .filter(attempt -> attempt.locationId() == locationId)
                     .filter(attempt -> attempt.response().getStatusCode().equals(HttpStatus.CREATED)).count();
             long expectedOccupied = context.expectedActiveStays(locationId) + successfulBookings;
-            int capacity = helper.configuredLocation(locationId).maxCapacity();
+            int capacity = context.expectedCapacity(locationId);
 
-            // Expectations come from Given fixtures and HTTP results, never repository counts.
+            // Expectations come from scenario inputs and HTTP results, never repository counts.
             assertThat(expectedOccupied).as("location %s stays within capacity", locationId)
                     .isBetween(0L, (long) capacity);
             requestAvailability("/parking/" + locationId);
@@ -139,10 +116,8 @@ public class ParkingOccupancySteps {
     }
 
     private void requestAvailability(String path) {
-        response = helper.getClient().get()
-                .uri(path)
-                .retrieve()
-                .toEntity(OccupancyResponse.class);
+        response = helper.getOccupancy(path);
+        context.recordAttemptResponse(response);
 
         assertThat(response.getStatusCode())
                 .as("occupancy response status")
