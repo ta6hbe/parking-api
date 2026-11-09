@@ -4,6 +4,8 @@ A car park management REST API for the Test Driven Solutions Java take-home task
 
 My assumptions and the questions I would have asked are listed [below](#assumptions). The [solution design](documents/parking-api-solution-design.md) describes the architecture, the main trade-offs, and current limitations.
 
+The design separates domain models from HTTP DTOs and abstracts storage behind repository interfaces. This makes it easier to replace the in-memory implementations with database adapters and separate persistence entities while preserving the API contract. See [extensibility and flexibility](documents/parking-api-solution-design.md#extensibility-and-flexibility) for the approach and the concurrency guarantees a database implementation must retain.
+
 ## Prerequisites
 
 - Java 21, with `JAVA_HOME` pointing to the JDK when building.

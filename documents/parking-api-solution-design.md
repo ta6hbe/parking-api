@@ -54,6 +54,14 @@ There are three repositories, each owning one map:
 
 Locations come from startup configuration, so there is no location repository. A shared `Clock` bean supplies time, which lets tests control entry and exit times.
 
+## Extensibility and flexibility
+
+Domain models are separate from HTTP request and response DTOs, with mappers translating between them. This allows the API contract and business model to evolve independently. The current in-memory stores hold domain records directly; there are no database persistence entities. A future database implementation would introduce separate persistence entities and map them to and from the domain model, keeping database annotations and storage details out of the domain and public DTOs.
+
+Services depend on repository interfaces. The current implementations are Spring-managed repository beans backed by concurrent in-memory structures, rather than Spring Data repositories. A database adapter could implement those interfaces and be supplied through dependency injection, keeping storage changes concentrated in the persistence layer and preserving the service-facing contracts.
+
+The interfaces make that replacement easier, but a database implementation must preserve atomic insertion, conditional removal and reservation ownership. Supporting multiple application instances would also require database constraints and a transaction or distributed locking strategy for parking and departure. These guarantees would need integration tests against the chosen database.
+
 ## Parking
 
 ```mermaid
