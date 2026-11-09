@@ -109,6 +109,64 @@ class InMemoryActiveParkingStayRepositoryTest {
                 .hasValue(1);
     }
 
+    @Test
+    void findsTheActiveStayByRegistration() {
+        ParkingStay stay = TestFixtures.ACTIVE_STAY_L1_1;
+        givenActiveStays(List.of(stay));
+
+        assertThat(subject.findByVehicleRegistration(stay.vehicleRegistration()))
+                .as("active stay for the requested registration")
+                .contains(stay);
+    }
+
+    @Test
+    void returnsEmptyForAnUnknownRegistration() {
+        assertThat(subject.findByVehicleRegistration("AB12CDE"))
+                .as("no active stay for an unknown registration")
+                .isEmpty();
+    }
+
+    @Test
+    void removesTheMatchingActiveStay() {
+        ParkingStay stay = TestFixtures.ACTIVE_STAY_L1_1;
+        givenActiveStays(List.of(stay));
+
+        assertThat(subject.remove(stay))
+                .as("matching active stay is removed")
+                .isTrue();
+
+        assertThat(subject.findByVehicleRegistration(stay.vehicleRegistration()))
+                .as("departed registration is no longer active")
+                .isEmpty();
+
+        assertThat(subject.countByLocationId(stay.locationId()))
+                .as("removed stay no longer contributes to occupancy")
+                .isZero();
+    }
+
+    @Test
+    void doesNotRemoveADifferentStayWithTheSameRegistration() {
+        ParkingStay original = TestFixtures.ACTIVE_STAY_L1_1;
+        givenActiveStays(List.of(original));
+
+        ParkingStay differentStay = duplicateRegistrationAtAnotherLocation();
+
+        assertThat(subject.remove(differentStay))
+                .as("a different stay cannot remove the original")
+                .isFalse();
+
+        assertThat(subject.findByVehicleRegistration(original.vehicleRegistration()))
+                .as("original active stay remains unchanged")
+                .contains(original);
+    }
+
+    @Test
+    void returnsFalseWhenRemovingAnAbsentStay() {
+        assertThat(subject.remove(TestFixtures.ACTIVE_STAY_L1_1))
+                .as("an absent stay cannot be removed")
+                .isFalse();
+    }
+
     // Each row supplies a description, occupied space numbers, and the expected lowest free space.
     private static Stream<Arguments> minimumFreeSpaceCases() {
         return Stream.of(

@@ -32,6 +32,11 @@ public class InMemoryActiveParkingStayRepository implements ActiveParkingStayRep
     }
 
     @Override
+    public Optional<ParkingStay> findByVehicleRegistration(String vehicleRegistration) {
+        return Optional.ofNullable(activeStays.get(vehicleRegistration));
+    }
+
+    @Override
     public List<Integer> findOccupiedSpacesByLocationId(long locationId) {
         return new ArrayList<>(activeStays.values().stream()
                 .filter(stay -> stay.locationId() == locationId)
@@ -57,5 +62,10 @@ public class InMemoryActiveParkingStayRepository implements ActiveParkingStayRep
         return candidate <= maxCapacity ?
                 OptionalInt.of(candidate) :
                 OptionalInt.empty();
+    }
+
+    @Override
+    public boolean remove(ParkingStay stay) {
+        return activeStays.remove(stay.vehicleRegistration(), stay);
     }
 }

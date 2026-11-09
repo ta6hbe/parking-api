@@ -19,4 +19,8 @@ public interface ActiveParkingStayRepositoryI {
 
     Optional<ParkingStay> tryAdd(ParkingStay parkingStay);
 
+    Optional<ParkingStay> findByVehicleRegistration(String vehicleRegistration);
+
+    boolean remove(ParkingStay stay);
+
 }
