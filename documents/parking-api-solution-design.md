@@ -126,7 +126,7 @@ sequenceDiagram
     HTTP-->>Client: 200 final bill with the original session UUID
 ```
 
-Departure finds the active stay by registration, reserves its space, and confirms the same session is still active. It then captures one exit time, calculates the charge, adds the completed stay to history and removes the active stay. Removing the active stay is the commit point. If the removal fails, the history entry this request added is removed again. If the space is already reserved by another request, departure returns 409 straight away rather than retrying.
+Departure finds the active stay by registration, reserves its space, and confirms the same session is still active. It then captures one exit time, calculates the charge, adds the completed stay to history and removes the active stay. Removing the active stay is the commit point. If active removal fails, the service attempts to remove only the history entry this request inserted; cleanup failures are attached to the original exception. If the space is already reserved by another request, departure returns 409 straight away rather than retrying.
 
 The charge is calculated in whole pence with `long` arithmetic:
 
@@ -172,8 +172,18 @@ Rates and the interval charge are set in `billing.properties`.
 - Location configuration is not validated at startup, for example for duplicate IDs or a missing default location.
 - Validation errors return a general message rather than naming the field.
 - Unexpected server errors use Spring's default error response, not Problem Details.
-- Departure has one acceptance scenario. Concurrent departure is unit-tested but has no HTTP scenario.
+- Departure has one acceptance scenario. Unit tests cover reservation conflicts, session rechecks and failure cleanup; simultaneous departure requests are not tested. These and the tests listed below were omitted for brevity in this take-home.
 - A request that hangs while holding a space reservation keeps that space locked until restart. There is no lease or timeout.
+
+### Tests planned but not written
+
+These were left out to keep the take-home to a reasonable size:
+
+- **Concurrent departure over HTTP:** two simultaneous bill requests for the same vehicle, and a departure racing a new arrival for the freed space.
+- **Overnight departure over HTTP:** a charge across midnight. Long stays are already covered by the billing unit tests.
+- **Further departure scenarios:** a vehicle that is not parked (404), an invalid request (400), and a new arrival taking the space just freed.
+- **Location configuration validation:** duplicate IDs, a missing default location, non-positive capacity and a negative retry budget. These need startup checks as well as tests.
+- **Billing configuration:** binding tests with invalid values.
 
 ## Future extension options
 
